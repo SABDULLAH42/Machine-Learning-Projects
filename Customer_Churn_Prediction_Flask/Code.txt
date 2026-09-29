@@ -1,0 +1,310 @@
+Customer_Churn_Prediction_Flask
+
+
+from fastapi import FastAPI, Form
+from pydantic import BaseModel
+import pandas as pd
+import pickle
+
+# Load model, encoders, and scaler
+with open('best_model.pkl', 'rb') as model_file:
+    loaded_model = pickle.load(model_file)
+with open('encoder.pkl', 'rb') as encoders_file:
+    encoders = pickle.load(encoders_file)
+with open('scaler.pkl', 'rb') as scaler_file:
+    scaler_data = pickle.load(scaler_file)
+
+
+# Initialize FastAPI app
+app = FastAPI()
+
+def make_prediction(input_data):
+    input_df = pd.DataFrame([input_data])
+
+    for col, encoder in encoders.items():
+        input_df[col] = encoder.transform(input_df[col])
+
+    numerical_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+    input_df[numerical_cols] = scaler_data.transform(input_df[numerical_cols])
+
+    prediction = loaded_model.predict(input_df)[0]
+    probability = loaded_model.predict_proba(input_df)[0, 1]
+    return "Churn" if prediction == 1 else "No Churn", probability
+
+
+class PredictionRequest(BaseModel):
+    gender: str
+    SeniorCitizen: int
+    Partner: str
+    Dependents: str
+    tenure: int
+    PhoneService: str
+    MultipleLines: str
+    InternetService: str
+    OnlineSecurity: str
+    OnlineBackup: str
+    DeviceProtection: str
+    TechSupport: str
+    StreamingTV: str
+    StreamingMovies: str
+    Contract: str
+    PaperlessBilling: str
+    PaymentMethod: str
+    MonthlyCharges: float
+    TotalCharges: float
+
+@app.post("/predict")
+async def predict(data: PredictionRequest):
+    input_data = data.dict()
+    prediction, probability = make_prediction(input_data)
+    return {"prediction": prediction, "probability": probability}
+
+
+
+
+
+
+
+The overall pipeline is:
+______________________________
+
+User Input
+    ↓
+Dictionary
+    ↓
+Pandas DataFrame
+    ↓
+Categorical Encoding
+    ↓
+Numerical Scaling
+    ↓
+ML Model
+    ↓
+Prediction + Probability
+
+
+Overall flow
+___________________
+
+                    FastAPI Application
+                           │
+                           ▼
+              ┌─────────────────────────┐
+              │ Load saved ML components│
+              └────────────┬────────────┘
+                           │
+             ┌─────────────┼─────────────┐
+             ▼             ▼             ▼
+       best_model.pkl  encoder.pkl   scaler.pkl
+             │             │             │
+             ▼             ▼             ▼
+       loaded_model     encoders     scaler_data
+             │             │             │
+             └─────────────┼─────────────┘
+                           ▼
+                    User input data
+                           │
+                           ▼
+                     Preprocessing
+                    Encoder + Scaler
+                           │
+                           ▼
+                    loaded_model
+                           │
+                           ▼
+                       Prediction
+
+
+Encode categorical columns
+
+So encoders is probably a dictionary similar to:
+
+{
+    "gender": gender_encoder,
+    "Partner": partner_encoder,
+    "Dependents": dependents_encoder,
+    "PhoneService": phone_encoder
+}
+
+Transform categorical values
+
+input_df[col] = encoder.transform(input_df[col])
+
+6. Loop example
+
+Suppose:
+
+encoders = {
+    "gender": gender_encoder,
+    "Partner": partner_encoder,
+    "Contract": contract_encoder
+}
+
+for col, encoder in encoders.items():
+
+gender_encoder.transform(input_df["gender"])
+partner_encoder.transform(input_df["Partner"])
+contract_encoder.transform(input_df["Contract"])
+
+
+7. Define numerical columns
+numerical_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+
+8. Scale numerical columns
+input_df[numerical_cols] = scaler_data.transform(input_df[numerical_cols])
+
+This applies the previously trained scaler to those three numerical columns.
+
+The scaler learned statistics such as:
+
+mean
+standard deviation
+
+For example, conceptually:
+
+scaled value = (value - training mean) / training standard deviation
+
+You want the new customer's data to be transformed using the same scaling rules used during training.
+
+Training Data
+     ↓
+scaler.fit()
+     ↓
+Scaler learns mean/std
+     ↓
+Save scaler.pkl
+     ↓
+API loads scaler.pkl
+     ↓
+New Customer
+     ↓
+scaler.transform()
+
+
+5. Why does the model return [1] instead of just 1?
+
+Because predict() is designed to make predictions for multiple rows at once.
+
+Imagine you give it 3 customers:
+
+Customer 1
+Customer 2
+Customer 3
+
+The model might return:
+
+np.array([1, 0, 1])
+
+Customer       Prediction
+-------------------------
+Customer 1       1
+Customer 2       0
+Customer 3       1
+
+The array positions are:
+
+Index:       0    1    2
+             ↓    ↓    ↓
+Result:     [1,   0,   1]
+
+6. Your project has only ONE customer
+
+In your FastAPI application, you're sending one customer:
+
+input_df = pd.DataFrame([input_data])
+
+So your DataFrame has one row:
+
+       tenure    MonthlyCharges
+Row 0    24          70.50
+
+loaded_model.predict(input_df
+returns:
+
+array([1])
+
+
+7. Now let's understand predict_proba()
+
+Suppose your model has two classes:
+
+0 = No Churn
+1 = Churn
+
+For one customer:
+
+loaded_model.predict_proba(input_df)
+
+np.array([[0.20, 0.80]])
+
+Notice the two square brackets.
+
+Think of it as a table:
+
+             Class 0     Class 1
+             No Churn     Churn
+                ↓           ↓
+             ┌──────┬──────┐
+Row 0        │ 0.20 │ 0.80 │
+             └──────┴──────┘
+
+There is:
+
+1 row because you have 1 customer
+2 columns because there are 2 classes
+
+8. What does [0, 1] mean now?
+
+You have:
+
+np.array([
+    [0.20, 0.80]
+])
+
+Think of positions:
+
+                 Column
+              0          1
+              ↓          ↓
+           ┌──────┬──────┐
+Row 0      │ 0.20 │ 0.80 │
+           └──────┴──────┘
+              ↑          ↑
+           [0,0]       [0,1]
+
+result[0, 0]
+
+gives:
+
+0.20
+
+That's the probability of class 0, No Churn.
+
+result[0, 1]
+
+gives:
+
+0.80
+
+That's the probability of class 1, Churn.
+
+Therefore:
+
+probability = loaded_model.predict_proba(input_df)[0, 1]
+
+means:
+
+Go to row 0, column 1, and give me that number.
+
+So:
+
+probability = 0.80
+
+
+
+
+
+
+
+
+
