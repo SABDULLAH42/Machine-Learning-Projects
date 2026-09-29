@@ -1,0 +1,32 @@
+
+
+
+__________________________Anaconda Prompt___________________
+
+conda create -n credit_risk python=3.10 -y
+
+conda activate credit_risk
+
+conda install numpy pandas scipy matplotlib seaborn scikit-learn jupyter ipykernel openpyxl -y
+
+pip install xgboost lightgbm imbalanced-learn joblib streamlit
+
+
+Register credit_risk with Jupyter
+
+
+python -m ipykernel install --user --name credit_risk --display-name "Python (credit_risk)"
+
+Verify the environment
+
+python --version
+
+Check the important packages:
+
+python -c "import numpy, pandas, scipy, sklearn, matplotlib, seaborn, xgboost, lightgbm, streamlit , imblearn; print('All libraries working')"
+
+
+
+
+
+
