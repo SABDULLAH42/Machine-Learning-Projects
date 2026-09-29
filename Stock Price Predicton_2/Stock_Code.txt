@@ -1,0 +1,939 @@
+Adj_close_price = google_data[['Close']]
+
+max(Adj_close_price.values),min(Adj_close_price.values)
+
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler(feature_range=(0,1))
+scaled_data = scaler.fit_transform(Adj_close_price)
+scaled_data
+
+len(scaled_data)
+
+x_data = []
+y_data = []
+
+for i in range(100, len(scaled_data)):
+    x_data.append(scaled_data[i-100:i])
+    y_data.append(scaled_data[i])
+
+Use the previous 100 days of Google's stock price to predict the price of the next day.
+
+Let's understand it with a simple example.
+
+x_data → Previous 100 days
+y_data → Next day's price
+
+tart the loop from 100
+for i in range(100, len(scaled_data)):
+
+You have:
+
+len(scaled_data) = 4908
+
+Therefore:
+
+range(100, 4908)
+
+100
+101
+102
+103
+...
+4907
+
+Why start at 100?
+
+Because you need 100 previous days to make your first input.
+
+Take the previous 100 days
+
+This is the most important line:
+
+x_data.append(scaled_data[i-100:i])
+
+Suppose:
+
+i = 100
+
+Then:
+
+scaled_data[i-100:i]
+
+becomes:
+
+scaled_data[0:100]
+
+That means:
+
+Day 0
+Day 1
+Day 2
+...
+Day 99
+
+So you have 100 days of historical prices.
+
+These 100 days become your first input:
+
+X₁ = Days 0 → 99
+
+Get the next day's price
+
+Now:
+
+y_data.append(scaled_data[i])
+
+When:
+
+i = 100
+
+you get:
+
+scaled_data[100]
+
+So:
+
+X₁ = Days 0 → 99
+Y₁ = Day 100
+
+Therefore:
+
+Previous 100 days ──────→ Next day
+       INPUT               TARGET
+
+Day 0
+Day 1
+Day 2
+...
+Day 99                    Day 100
+
+The next iteration
+
+Now:
+
+i = 101
+
+Your input becomes:
+
+scaled_data[1:101]
+
+That's:
+
+Day 1
+Day 2
+...
+Day 100
+
+And your target becomes:
+
+scaled_data[101]
+
+So:
+
+Days 1 → 100 ──────→ Day 101
+
+Then:
+
+Days 2 → 101 ──────→ Day 102
+
+Why are there 4,808 sequences?
+
+You started with:
+
+4908 observations
+
+but you need 100 observations for the first input.
+
+Therefore:
+
+4908 - 100 = 4808
+
+So after the loop:
+
+len(x_data)
+
+should be:
+
+4808
+
+Convert lists into NumPy arrays
+
+Finally:
+
+import numpy as np
+
+x_data, y_data = np.array(x_data), np.array(y_data)
+
+You're converting the Python lists into NumPy arrays because machine learning libraries such as TensorFlow/Keras work efficiently with NumPy arrays.
+
+You can check:
+
+x_data.shape
+
+You should get approximately:
+
+(4808, 100, 1)
+
+4808 → Number of training sequences
+100  → Number of previous days used
+1    → Number of features (Adj Close)
+
+Suppose you had only 10 days of data and wanted to use the previous 3 days to predict the next day:
+
+Day    Price
+1      10
+2      12
+3      15
+4      14
+5      18
+6      20
+7      22
+8      21
+9      25
+10     27
+
+Your sequences would be:
+
+X                         Y
+
+Day 1, Day 2, Day 3  →    Day 4
+Day 2, Day 3, Day 4  →    Day 5
+Day 3, Day 4, Day 5  →    Day 6
+Day 4, Day 5, Day 6  →    Day 7
+Day 5, Day 6, Day 7  →    Day 8
+Day 6, Day 7, Day 8  →    Day 9
+Day 7, Day 8, Day 9  →    Day 10
+
+Your project is doing exactly the same thing, except:
+
+3 days  →  100 days
+10 rows →  4908 rows
+
+Absolutely. Let's go through the actual loop iteration by iteration using the small example of 10 days and a 3-day window.
+
+Suppose your scaled stock-price data is:
+
+| Index | Day    | Price |
+| ----: | ------ | ----: |
+|     0 | Day 1  |    10 |
+|     1 | Day 2  |    12 |
+|     2 | Day 3  |    15 |
+|     3 | Day 4  |    14 |
+|     4 | Day 5  |    18 |
+|     5 | Day 6  |    20 |
+|     6 | Day 7  |    22 |
+|     7 | Day 8  |    21 |
+|     8 | Day 9  |    25 |
+|     9 | Day 10 |    27 |
+
+
+We want to use the previous 3 days to predict the next day.
+
+So our code would be:
+
+x_data = []
+y_data = []
+
+for i in range(3, len(scaled_data)):
+    x_data.append(scaled_data[i-3:i])
+    y_data.append(scaled_data[i])
+
+Here:
+
+len(scaled_data) = 10
+
+Therefore:
+
+range(3, 10)
+
+gives:
+
+3, 4, 5, 6, 7, 8, 9
+
+Now let's go through every iteration.
+
+Iteration 1
+i = 3
+x_data
+
+Look at:
+
+scaled_data[i-3:i]
+
+Substitute i = 3:
+
+scaled_data[3-3:3]
+
+which becomes:
+
+scaled_data[0:3]
+
+Index 0 → Day 1 → 10
+Index 1 → Day 2 → 12
+Index 2 → Day 3 → 15
+
+Therefore:
+
+x_data.append([10, 12, 15])
+
+y_data
+
+Now:
+
+y_data.append(scaled_data[i])
+
+Substitute i = 3:
+
+y_data.append(scaled_data[3])
+
+Index 3 is:
+
+Day 4 → 14
+
+So:
+
+y_data.append(14)
+
+We now have:
+
+X = [10, 12, 15]
+Y = 14
+
+Meaning:
+
+Use Days 1, 2, 3 to predict Day 4.
+
+Iteration 2
+
+Now:
+
+i = 4
+x_data
+scaled_data[i-3:i]
+
+becomes:
+
+scaled_data[4-3:4]
+
+scaled_data[1:4]
+
+So we get:
+
+Index 1 → Day 2 → 12
+Index 2 → Day 3 → 15
+Index 3 → Day 4 → 14
+
+Therefore:
+
+x_data.append([12, 15, 14])
+
+y_data
+scaled_data[4]
+is:
+
+Day 5 → 18
+
+Therefore:
+
+y_data.append(18)
+
+Now:
+
+X = [12, 15, 14]
+Y = 18
+
+Meaning:
+
+Use Days 2, 3, 4 to predict Day 5.
+
+Iteration 3
+i = 5
+
+Input
+scaled_data[5-3:5]
+
+becomes:
+
+scaled_data[2:5]
+
+We get:
+
+Day 3 → 15
+Day 4 → 14
+Day 5 → 18
+
+So:
+
+x_data.append([15, 14, 18])
+
+Target
+scaled_data[5]
+
+is:
+
+Day 6 → 20
+
+So:
+
+y_data.append(20)
+
+Therefore:
+
+X = [15, 14, 18]
+Y = 20
+Iteration 4
+i = 6
+
+Input:
+
+scaled_data[6-3:6]
+scaled_data[3:6]
+
+Gives:
+
+Day 4 → 14
+Day 5 → 18
+Day 6 → 20
+
+Target:
+
+scaled_data[6]
+Day 7 → 22
+
+Therefore:
+
+X = [14, 18, 20]
+Y = 22
+
+Iteration 5
+i = 7
+
+Input:
+
+scaled_data[4:7]
+
+Gives:
+
+Day 5 → 18
+Day 6 → 20
+Day 7 → 22
+
+Target:
+
+scaled_data[7]
+Day 8 → 21
+
+Therefore:
+
+X = [18, 20, 22]
+Y = 21
+
+Iteration 7
+i = 9
+
+Input:
+
+scaled_data[6:9]
+
+Gives:
+
+Day 7 → 22
+Day 8 → 21
+Day 9 → 25
+
+Target:
+scaled_data[9]
+Day 10 → 27
+
+Therefore:
+
+X = [22, 21, 25]
+Y = 27
+
+Now look at the complete result
+
+After all 7 iterations:
+
+x_data
+
+contains:
+
+[10, 12, 15] → 14
+[12, 15, 14] → 18
+[15, 14, 18] → 20
+[14, 18, 20] → 22
+[18, 20, 22] → 21
+[20, 22, 21] → 25
+[22, 21, 25] → 27
+
+More precisely:
+
+x_data = [
+    [10, 12, 15],
+    [12, 15, 14],
+    [15, 14, 18],
+    [14, 18, 20],
+    [18, 20, 22],
+    [20, 22, 21],
+    [22, 21, 25]
+]
+
+y_data = [
+    14,
+    18,
+    20,
+    22,
+    21,
+    25,
+    27
+]
+
+Notice something important.
+
+x_data has 7 samples
+
+Why?
+
+10 total days - 3 days used as initial window = 7
+
+So:
+
+len(x_data) is 7
+
+
+
+Now connect this to your actual code
+
+Your actual code is:
+
+for i in range(100, len(scaled_data)):
+    x_data.append(scaled_data[i-100:i])
+    y_data.append(scaled_data[i])
+
+len(scaled_data) = 4908
+
+range(100, 4908)
+
+The first iteration is:
+
+i = 100
+
+Then:
+
+scaled_data[i-100:i]
+
+becomes:
+
+scaled_data[0:100]
+
+That's your first 100 days.
+
+And:
+
+scaled_data[i]
+
+becomes:
+
+scaled_data[100]
+
+That's your 101st day.
+
+So:
+
+Days 1 ───────── Day 100  → Day 101
+       X (input)             Y (target)
+
+Second iteration:
+
+i = 101
+
+Input:
+
+scaled_data[1:101]
+
+That's:
+
+Days 2 ───────── Day 101  → Day 102
+       X (input)             Y (target)
+
+Third:
+
+Days 3 ───────── Day 102  → Day 103
+       X (input)             Y (target)
+
+And this keeps sliding forward until the final iteration:
+
+Days 4808 ────── Day 4907  → Day 4908
+          X                    Y
+
+That's the entire purpose of:
+scaled_data[i-100:i]
+
+It says:
+
+"Give me the previous 100 observations."
+
+And:
+
+scaled_data[i]
+
+
+________Train & Test Split_________
+
+splitting_len = int(len(x_data)*0.7)
+x_train = x_data[:splitting_len]
+y_train = y_data[:splitting_len]
+
+x_test = x_data[splitting_len:]
+y_test = y_data[splitting_len:]
+
+len(x_data) = 4930
+4930 × 0.7 = 3451
+splitting_len = 3451
+x_train = x_data[:splitting_len]
+x_train = x_data[:3451]
+
+y_train = y_data[:splitting_len]
+y_train = y_data[:3451]
+
+So you're taking the first 3451 target values.
+
+For example:
+
+x_train[0] → y_train[0]
+x_train[1] → y_train[1]
+x_train[2] → y_train[2]
+...
+x_train[3450] → y_train[3450]
+
+Create x_test
+
+x_test = x_data[splitting_len:]
+becomes:
+
+x_test = x_data[3451:]
+
+So:
+
+So:
+
+x_data
+│
+├───────────────┬───────────────────┐
+│               │                   │
+│   Training    │      Testing      │
+│               │                   │
+│ 0 → 3450      │ 3451 → 4929       │
+│               │                   │
+│ 3451 samples  │ 1479 samples      │
+└───────────────┴───────────────────┘
+
+Create y_test
+y_test = y_data[splitting_len:]
+
+becomes:
+
+y_test = y_data[3451:]
+
+This gives you the remaining 1479 target values.
+
+Again, the relationship remains:
+
+x_test[0] → y_test[0]
+x_test[1] → y_test[1]
+x_test[2] → y_test[2]
+
+...
+
+The complete picture
+
+Your original data:
+
+5030 stock-price observations
+
+You used a 100-day lookback window:
+
+5030 - 100 = 4930 sequences
+
+Then you split those 4930 sequences:
+
+                     4930 sequences
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+           70%                         30%
+             │                           │
+          3451                         1479
+             │                           │
+          TRAIN                         TEST
+
+And each sequence looks like:
+
+100 previous days → next day
+
+So your training data looks like:
+
+x_train[0] → y_train[0]
+   ↓
+100 days   → Day 101
+
+x_train[1] → y_train[1]
+   ↓
+100 days   → Day 102
+
+x_train[2] → y_train[2]
+   ↓
+100 days   → Day 103
+
+...
+
+x_train[3450] → y_train[3450]
+
+Then your test data continues from there:
+
+x_test[0] → y_test[0]
+   ↓
+100 days → next day
+
+x_test[1] → y_test[1]
+   ↓
+100 days → next day
+
+...
+
+print(x_train.shape)
+print(y_train.shape)
+print(x_test.shape)
+print(y_test.shape)
+
+from keras.models import Sequential
+from keras.layers import Dense, LSTM
+model = Sequential()
+model.add(LSTM(128, return_sequences=True, input_shape=(x_train.shape[1],1)))
+model.add(LSTM(64,return_sequences=False))
+model.add(Dense(25))
+model.add(Dense(1))
+
+Sequential() allows you to add layers one after another.
+
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+model.fit(x_train, y_train, batch_size=1, epochs = 2)
+
+model.summary()
+
+predictions = model.predict(x_test)
+predictions
+
+inv_predictions = scaler.inverse_transform(predictions)
+inv_predictions
+
+inv_y_test = scaler.inverse_transform(y_test)
+inv_y_test
+
+rmse = np.sqrt(np.mean( (inv_predictions - inv_y_test)**2))
+
+rmse
+
+ploting_data = pd.DataFrame(
+ {
+  'original_test_data': inv_y_test.reshape(-1),
+    'predictions': inv_predictions.reshape(-1)
+ } ,
+    index = google_data.index[splitting_len+100:]
+)
+ploting_data.head()
+
+This code is preparing a DataFrame that puts your actual Google stock prices and LSTM predictions side by side, so you can compare them and plot them.
+
+inv_y_test.reshape(-1)
+'original_test_data': inv_y_test.reshape(-1)
+
+Earlier, your y_test contained scaled prices.
+
+For example:
+
+y_test
+
+[[0.52]
+ [0.55]
+ [0.58]
+ [0.60]]
+
+You presumably used:
+
+inv_y_test = scaler.inverse_transform(y_test)
+
+to convert them back into actual stock prices:
+
+inv_y_test
+
+[[145.20]
+ [148.50]
+ [151.30]
+ [153.10]]
+
+So:
+
+inv_y_test
+
+has a shape like:
+
+(1479, 1)
+
+The 1 exists because you have one feature, Adj Close
+
+What does .reshape(-1) do?
+
+Suppose:
+
+inv_y_test
+
+is:
+
+[[145.20],
+ [148.50],
+ [151.30],
+ [153.10]]
+
+Shape:
+
+(4, 1)
+
+After:
+
+inv_y_test.reshape(-1)
+
+you get:
+
+[145.20, 148.50, 151.30, 153.10]
+
+(4,)
+
+So reshape(-1) essentially flattens the array into one dimension.
+
+The same thing happens to your predictions:
+
+inv_predictions.reshape(-1)
+
+Why are we using inv_predictions?
+
+Your LSTM predicts scaled values, because you trained it using scaled_data.
+
+For example:
+
+LSTM prediction:
+
+[[0.52]
+ [0.55]
+ [0.58]]
+
+Those aren't actual Google prices.
+
+You therefore use:
+
+inv_predictions = scaler.inverse_transform(predictions)
+
+to convert them back to actual prices:
+
+[[145.20]
+ [148.50]
+ [151.30]]
+
+Now both:
+
+inv_y_test
+
+and:
+
+inv_predictions
+
+are in the same units, actual stock prices.
+
+index = google_data.index[splitting_len+100:]
+
+This is assigning the actual dates to your results.
+
+Let's understand why +100 is necessary.
+
+You originally had:
+
+5030 stock observations
+
+Then you used:
+
+100 days
+
+to create your first sequence.
+
+So:
+
+Days 1-100 → predict Day 101
+Your x_data therefore starts producing targets from the 101st observation.
+
+Then you split:
+
+4930 sequences
+      ↓
+70% training
+30% testing
+
+The testing portion starts after:
+
+splitting_len
+
+training sequences.
+
+But remember, your sequence creation already consumed the first 100 observations as the initial lookback window.
+
+Let's use your numbers
+
+You have:
+
+Original data = 5030 rows
+
+Sequence window:
+
+100
+
+Therefore:
+
+5030 - 100 = 4930 sequences
+
+Training:
+
+4930 × 70% = 3451
+
+Testing:
+
+4930 - 3451 = 1479
+
+So your test predictions correspond to approximately:
+
+Original index 3551 → 5029
+
+because:
+
+3451 + 100 = 3551
+
+That's why:
+
+google_data.index[splitting_len+100:]
+
+starts from:
+
+google_data.index[3551:]
+
+and gives you the dates corresponding to the test predictions.
+
+plot_graph((15,6), ploting_data, 'test data')
+
+plot_graph((15,6), pd.concat([Adj_close_price[:splitting_len+100],ploting_data], axis=0), 'whole data')
+
+model.save("Latest_stock_price_model.keras")
+
+
+
+
+

@@ -1,0 +1,534 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from keras.models import load_model
+import matplotlib.pyplot as plt
+import yfinance as yf
+
+st.title("Stock Price Predictor App")
+
+stock = st.text_input("Enter the Stock ID", "GOOG")
+
+# define the duration
+from datetime import datetime
+end = datetime.now()
+start = datetime(end.year-20,end.month,end.day)
+
+# Instead of using the below download code
+# google_data = yf.download(stock, start, end)
+
+
+google_data = yf.download(
+    stock,
+    start=start,
+    end=end,
+    auto_adjust=False,
+    multi_level_index=False
+)
+
+model = load_model("Latest_stock_price_model.keras")
+st.subheader("Stock Data")
+st.write(google_data)
+
+# We only need test data as train data already in the saved model
+splitting_len = int(len(google_data)*0.7)
+# Instead of using
+# x_test = pd.DataFrame(google_data.Close[splitting_len:])
+x_test = google_data[['Close']].iloc[splitting_len:].copy()     #30% test data
+
+# initially we have 3 parameters then later we add extra_data and extra_dataset
+# because for creating or fitting the parameter MA_for_250_days
+def plot_graph(figsize, values, full_data, extra_data = 0, extra_dataset = None):
+    fig = plt.figure(figsize=figsize)
+    plt.plot(values,'Orange')
+    plt.plot(full_data.Close, 'b')
+    if extra_data:                     #if extra_data is not zero
+        plt.plot(extra_dataset)
+    return fig
+
+st.subheader('Original Close Price and MA for 250 days')
+google_data['MA_for_250_days'] = google_data.Close.rolling(250).mean()
+st.pyplot(plot_graph((15,6), google_data['MA_for_250_days'],google_data,0))
+
+st.subheader('Original Close Price and MA for 200 days')
+google_data['MA_for_200_days'] = google_data.Close.rolling(200).mean()
+st.pyplot(plot_graph((15,6), google_data['MA_for_200_days'],google_data,0))
+
+st.subheader('Original Close Price and MA for 100 days')
+google_data['MA_for_100_days'] = google_data.Close.rolling(100).mean()
+st.pyplot(plot_graph((15,6), google_data['MA_for_100_days'],google_data,0))
+
+st.subheader('Original Close Price and MA for 100 days and MA for 250 days')
+st.pyplot(plot_graph((15,6), google_data['MA_for_100_days'],google_data,1,google_data['MA_for_250_days']))
+
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler(feature_range=(0,1))
+scaled_data = scaler.fit_transform(x_test[['Close']])
+
+x_data = []
+y_data = []
+
+for i in range(100,len(scaled_data)):
+    x_data.append(scaled_data[i-100:i])
+    y_data.append(scaled_data[i])
+
+x_data, y_data = np.array(x_data), np.array(y_data)
+
+predictions = model.predict(x_data)
+
+inv_pre = scaler.inverse_transform(predictions)
+inv_y_test = scaler.inverse_transform(y_data)
+
+ploting_data = pd.DataFrame(
+ {
+  'original_test_data': inv_y_test.reshape(-1),
+    'predictions': inv_pre.reshape(-1)
+ } ,
+    index = google_data.index[splitting_len+100:]
+)
+st.subheader("Original values vs Predicted values")
+st.write(ploting_data)
+
+st.subheader('Original Close Price vs Predicted Close price')
+fig = plt.figure(figsize=(15,6))
+plt.plot(pd.concat([google_data.Close[:splitting_len+100],ploting_data], axis=0))
+plt.legend(["Data- not used", "Original Test data", "Predicted Test data"])
+st.pyplot(fig)
+
+
+
+
+
+
+
+---------------------Explanation---------------------------------
+
+Splitting the data
+splitting_len = int(len(google_data)*0.7)
+
+This calculates 70% of the total number of rows.
+
+Suppose you have:
+
+5000 rows
+
+Then:
+
+len(google_data)
+
+is:
+
+5000
+
+5000 * 0.7
+
+equals:
+
+3500
+
+splitting_len = 3500
+
+You are saying:
+
+Use the first 70% as the portion corresponding to training history, and use the remaining 30% for testing/prediction in this app.
+
+Selecting the test data
+x_test = pd.DataFrame(google_data.Close[splitting_len:])
+
+Let's break this apart.
+
+google_data.Close
+
+[splitting_len:]
+
+Suppose:
+
+splitting_len = 3500
+
+Then:
+
+google_data.Close[3500:]
+
+means:
+
+Start from row 3500 and take everything until the end.
+
+Creating the plotting function
+def plot_graph(figsize, values, full_data, extra_data = 0, extra_dataset = None):
+
+This defines a reusable function called:
+
+plot_graph()
+
+Instead of writing the same plotting code four times, you put it into a function.
+
+It has five parameters:
+
+figsize
+values
+full_data
+extra_data
+extra_dataset
+
+values
+
+The data you want to plot.
+
+For example:
+
+google_data['MA_for_250_days']
+
+full_data
+
+The complete stock DataFrame.
+
+You use:
+
+full_data.Close
+
+to plot the actual closing price.
+
+extra_data = 0
+
+This is an optional parameter.
+
+If you don't provide it, it automatically becomes:
+
+0
+
+extra_dataset = None
+
+Another optional parameter.
+
+If you don't provide it, it becomes:
+
+None
+
+plt.plot(values,'Orange')
+
+Plots the values.
+
+For example:
+
+google_data['MA_for_250_days']
+
+This creates the moving-average line.
+
+'Orange' specifies the line color.
+
+plt.plot(full_data.Close, 'b')
+
+Plots the actual closing price.
+
+'b' means blue.
+
+So your graph has:
+
+Orange = Moving Average
+Blue   = Actual Close Price
+
+-----------------------------------------------------
+
+Importing MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
+
+Imports MinMaxScaler from Scikit-learn.
+
+Its job is to scale your stock prices into a smaller range.
+
+You specify:
+
+feature_range=(0,1)
+
+so values are transformed approximately into:
+
+0 to 1
+
+scaler = MinMaxScaler(feature_range=(0,1))
+
+Creates a scaler object.
+
+Imagine your stock prices are:
+
+100
+200
+300
+400
+500
+
+The scaler converts them approximately to:
+
+0
+0.25
+0.50
+0.75
+1.00
+
+The actual calculation is:
+
+Xscaled  =     X −Xmin
+              ---------------------
+                 Xmax−Xmin
+
+Why do this?
+
+Because neural networks generally work better when numerical values are in a relatively small range.
+
+Scaling the test prices
+scaled_data = scaler.fit_transform(x_test[['Close']])
+
+This does two things.
+
+First: fit
+
+The scaler examines the data and learns:
+
+minimum price
+maximum price
+For example:
+
+min = 100
+max = 500
+
+Second: transform
+
+It converts every price into the 0 to 1 range.
+
+For example:
+
+100 → 0.00
+200 → 0.25
+300 → 0.50
+400 → 0.75
+500 → 1.00
+
+Converting lists to NumPy arrays
+x_data, y_data = np.array(x_data), np.array(y_data)
+
+Before this line, x_data and y_data are Python lists.
+
+You convert them into NumPy arrays because your Keras model expects numerical array-like input.
+
+After conversion, x_data will have a shape approximately like:
+
+(number_of_samples, 100, 1)
+
+For example:
+
+(1200, 100, 1)
+
+means:
+
+1200 sequences
+100 days per sequence
+1 feature per day
+
+That 1 is because you're only using:
+
+Close
+
+as the feature.
+
+Making predictions
+predictions = model.predict(x_data)
+
+This sends your sequences into the trained LSTM model.
+
+For example:
+
+Previous 100 prices
+        ↓
+      LSTM
+        ↓
+Predicted next price
+
+The model produces scaled predictions.
+
+For example, it might produce:
+
+0.72
+0.74
+0.71
+0.76
+
+These are not actual stock prices yet.
+
+They are scaled values.
+
+Converting predictions back to actual prices
+inv_pre = scaler.inverse_transform(predictions)
+
+inverse_transform() reverses the scaling.
+
+If the model predicted:
+
+0.75
+
+the scaler converts it back to the corresponding actual stock price.
+
+For example:
+
+0.75 → $400
+
+So:
+
+inv_pre
+
+contains the predicted prices in the original price scale
+
+Converting actual test values back
+inv_y_test = scaler.inverse_transform(y_data)
+
+Remember:
+
+y_data
+
+also contains scaled values.
+
+This converts them back to the original stock prices.
+
+So now:
+
+inv_y_test
+
+contains the actual test prices.
+
+You now have:
+
+inv_y_test = Actual prices
+inv_pre    = Predicted prices
+
+Understanding reshape(-1)
+
+Suppose:
+
+inv_y_test
+
+has shape:
+
+(1000, 1)
+
+You want:
+
+1000
+
+values in one dimension.
+
+So:
+
+reshape(-1)
+
+means:
+
+Flatten this into a single dimension. NumPy figure out the required length automatically.
+
+For example:
+
+[[100],
+ [102],
+ [105]]
+
+becomes:
+
+[100, 102, 105]
+
+Setting the DataFrame index
+index = google_data.index[splitting_len+100:]
+
+This assigns dates to your prediction results.
+
+Why:
+
+You lose the first 100 observations because you need 100 previous days before making the first prediction.
+
+Suppose:
+
+splitting_len = 3500
+
+Then the first prediction corresponds to:
+
+3500 + 100
+
+So:
+
+google_data.index[3600:]
+
+is used as the index.
+
+This gives your prediction table actual dates.
+
+Your table might look like:
+
+| Date       | Original | Prediction |
+| ---------- | -------: | ---------: |
+| 2024-01-01 |    140.5 |      139.8 |
+| 2024-01-02 |    141.2 |      140.7 |
+| 2024-01-03 |    143.1 |      142.5 |
+
+
+The entire machine-learning portion in one picture
+
+The most important part of your project is this:
+
+Yahoo Finance
+     ↓
+Historical stock prices
+     ↓
+Take last 30%
+     ↓
+Close prices
+     ↓
+MinMaxScaler
+     ↓
+Values between 0 and 1
+     ↓
+Create 100-day windows
+     ↓
+┌──────────────────────────────┐
+│ Day 1 → Day 100              │
+│          ↓                   │
+│       Predict Day 101        │
+└──────────────────────────────┘
+     ↓
+┌──────────────────────────────┐
+│ Day 2 → Day 101              │
+│          ↓                   │
+│       Predict Day 102        │
+└──────────────────────────────┘
+     ↓
+        LSTM Model
+     ↓
+Scaled predictions
+     ↓
+inverse_transform()
+     ↓
+Actual stock-price scale
+     ↓
+Actual vs Predicted
+     ↓
+Streamlit table + graph
+
+
+
+
+	​
+
+	​
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
